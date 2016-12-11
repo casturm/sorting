@@ -51,7 +51,7 @@ SORT.runSelectionSort = (i=0) => {
 SORT.animateIndexOfMinAndSwap = (i) => {
   var steps = SORT.makeIterationSteps(i, SORT.array.length-1);
   SORT.animateIndexOfMin(steps, i, (min) => {
-    SORT.events.addListener('swapDone', 'callback', () => {
+    SORT.events.addListener('swapDone', () => {
       //console.log('swap listener ' + min);
       if (min !== i) {
         SORT.animateColorChange(min, 'bar-to-red');
@@ -95,10 +95,10 @@ SORT.animateSwap = (i, j, listener, timeout=1000) => {
     var jX = SORT.calcX(j);
 
     var count = 2;
-    SORT.events.addListener('translateBothDone', 'callback', () => {
+    SORT.events.addListener('translateBothDone', () => {
       SORT.events.notify(listener);
     });
-    SORT.events.addListener('translateOneDone', 'callback', () => {
+    SORT.events.addListener('translateOneDone', () => {
       count--;
       if (count == 0) {
         SORT.events.notify('translateBothDone');
@@ -150,7 +150,7 @@ SORT.runCycle = (b, cycle, listener) => {
 
 SORT.events = {
   listeners: new Array(),
-  addListener: (name, type, callback) => {
+  addListener: (name, callback) => {
     SORT.events.listeners[name] = callback;
   },
   removeListener: (name) => {
@@ -234,7 +234,7 @@ SORT.runIterationAnimation = (start=0, end=(SORT.array.length-1), timeout=1000) 
 SORT.animateIteration = (steps, timeout) => {
   if ((step = steps.shift()) !== undefined) {
     SORT.animateColorChange(step, 'bar-to-blue');
-    SORT.events.addListener(step, 'iteration', () => {
+    SORT.events.addListener(step, () => {
       SORT.animateIteration(steps, timeout);
     });
     setTimeout(() => {
