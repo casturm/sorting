@@ -1,0 +1,36 @@
+#sort {
+    border: 1px solid;
+    position: relative;
+    height: 400px;
+    width: 600px;
+    /*margin: auto;*/
+    margin: 50px;
+}
+
+.bar-red {
+    fill: rgb(220, 20, 60);
+}
+
+.bar-green {
+    fill: rgb(0, 150, 76);
+}
+
+.bar-blue {
+    fill: lightblue;
+}
+
+.bar-to-blue {
+    transition: fill .2s ease;
+    fill: lightblue;
+}
+
+.bar-to-red {
+    transition: fill .3s ease;
+    fill: rgb(220, 20, 60);
+}
+
+.bar-to-green {
+    transition: fill .5s ease;
+    fill: rgb(0, 150, 76);
+}
+
