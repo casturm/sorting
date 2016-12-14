@@ -16,133 +16,95 @@ var SORT = SORT || {};
   const BLINK_TIMEOUT = 1000;
 
   ns.runSelectionSort = (i=0) => {
+    animateIteration(0);
+  }
+
+  var animateIteration = (i=0) => {
     if (i < bars.length) {
-      animateIndexOfMinAndSwap(i);
+      animateIndexOfMin(i, i, (m) => {
+        animateSwap(i, m, () => { 
+          animateIteration(i+1);
+        });
+      });
     }
   }
 
-  var animateIndexOfMinAndSwap = (i) => {
-    var barI = bars[i];
-    var steps = makeIterationSteps(i, bars.length-1);
-    animateIndexOfMin(steps, i, (min) => {
-      events.addListener('swapDone', () => {
-        if (min !== i) {
-          var barM = bars[min];
-          barM.animateColorChange('bar-to-red');
-        }
-        ns.runSelectionSort(i+1)
-      });
-      animateSwap(i, min, 'swapDone');
-    });
-  }
-
-  var animateIndexOfMin = (steps, m, callback, timeout=500) => {
-    if (steps.length > 0) {
-      var step = steps.shift();
-      var bar = bars[step];
-      var barM = bars[m];
-      bar.animateColorChange('bar-to-green');
+  var animateIndexOfMin = (i, m, callback, timeout=500) => {
+    if (i < bars.length) {
+      bars[i].animateColorChange('bar-to-green');
       setTimeout(() => {
-        if (bar.getV() <= barM.getV()) {
-          barM.animateColorChange('bar-to-red');
-          m = step;
-          barM = bars[m];
-          barM.animateColorChange('bar-to-green');
+        if (bars[i].getV() <= bars[m].getV()) {
+          bars[m].animateColorChange('bar-to-red');
+          m = i;
+          bars[m].animateColorChange('bar-to-green');
         }
         else {
-          bar.animateColorChange('bar-to-red');
+          bars[i].animateColorChange('bar-to-red');
         }
-        animateIndexOfMin(steps, m, callback);
+        animateIndexOfMin(i+1, m, callback);
       }, timeout);
     }
     else {
-      if (callback) {
-        callback.call(this, m);
-      }
+      callback(m);
     }
   }
 
-  var animateSwap = (i, j, listener, timeout=1000) => {
-    var barI = bars[i];
-    var barJ = bars[j];
-    barI.animateColorChange('bar-to-blue');
-    barJ.animateColorChange('bar-to-blue');
+  var animateSwap = (i, j, callback, timeout=1000) => {
+    bars[i].animateColorChange('bar-to-blue');
+    bars[j].animateColorChange('bar-to-blue');
 
     setTimeout(() => {
       var iX = canvas.calcX(i);
       var jX = canvas.calcX(j);
-
-      var count = 2;
-      events.addListener('translateBothDone', () => {
-        events.notify(listener);
+      var pi = new Promise((complete) => {
+        animateTranslateX(bars[i], jX, complete); 
       });
-      events.addListener('translateOneDone', () => {
-        count--;
-        if (count == 0) {
-          events.notify('translateBothDone');
+      var pj = new Promise((complete) => {
+        animateTranslateX(bars[j], iX, complete); 
+      });
+      Promise.all([pi, pj]).then(() => {
+        if (i != j) {
+          bars[i].animateColorChange('bar-to-red');
         }
+        var t = bars[i];
+        bars[i] = bars[j];
+        bars[j] = t;
+        callback();
       });
-      animateTraslateX(bars[i], jX, 'translateOneDone');
-      animateTraslateX(bars[j], iX, 'translateOneDone');
-
-      var t = bars[i];
-      bars[i] = bars[j];
-      bars[j] = t;
     }, timeout);
   }
 
-  var makeIterationSteps = (from, to) => {
-    var cycle = new Array();
-    if (from > to) {
-      while (from > to) {
-        cycle.push(from);
-        from -= 1;
-      }
-    }
-    else {
-      while (from < to) {
-        cycle.push(from);
-        from += 1;
-      }
-    }
-    cycle.push(to);
-    return cycle;
-  }
-
-  var animateTraslateX = (b, toX, listener) => {
+  var animateTranslateX = (b, toX, callback) => {
     var fromX = b.getX();
-    var cycle = makeIterationSteps(fromX, toX);
-    var timeout = 500 / cycle.length;
-    runCycle(b, cycle, timeout, listener);
+    var moves = makeMoves(fromX, toX);
+    moves = moves.map((x) => { return { x: x, y: b.getY() } });
+    var delay = (1/moves.length) * 500;
+    move(b, moves, delay, callback);
   }
 
-  var runCycle = (b, cycle, timeout, listener) => {
-    if ((toX = cycle.shift())) {
-      b.draw(toX);
-      setTimeout(() => { runCycle(b, cycle, timeout, listener); }, timeout);
+  var makeMoves = (from, to) => {
+    var moves = new Array();
+    var inc = (from > to) ? () => --from : () => ++from;
+    var distance = Math.sqrt(Math.pow((from - to), 2));
+    while (--distance > 0) {
+      moves.push(inc());
+    }
+    moves.push(to);
+    return moves;
+  }
+
+  var move = (b, moves, delay, callback) => {
+    if ((coords = moves.shift())) {
+      b.draw(coords.x, coords.y);
+      setTimeout(() => {
+        move(b, moves, delay, callback);
+      }, delay);
     }
     else {
-      events.notify(listener);
+      callback();
     }
   }
 
-  var events = {
-    listeners: new Array(),
-    addListener: (name, callback) => {
-      events.listeners[name] = callback;
-    },
-    removeListener: (name) => {
-      events.listeners[name] = null;
-    },
-    notify: (name) => {
-      console.log('notify ' + name);
-      if ((el = events.listeners[name])) {
-        console.log('call ' + el);
-        el.call();
-      }
-    }
-  };
-  
   var Bar = function(i) {
     var g = canvas.svg('g');
     var r = canvas.svg('rect');
@@ -200,35 +162,11 @@ var SORT = SORT || {};
     }
   })();
   
-  var bars = canvas.bars;
+  ns.bars = canvas.bars;
+  var bars = ns.bars;
+
   ns.init = () => {
     canvas.clear(); 
     canvas.draw();
   };
 })(SORT);
-
-/*
-
-Attributes = (g, r, x, y, v) => {
-  return { G: g, R: r, X: x, Y: y, V: v }
-}
-
-runIterationAnimation = (start=0, end=(bars.length-1), timeout=1000) => {
-  var steps = makeIterationSteps(start, end);
-  animateIteration(steps, timeout);
-}
-
-animateIteration = (steps, timeout) => {
-  if ((step = steps.shift()) !== undefined) {
-    animateColorChange(step, 'bar-to-blue');
-    events.addListener(step, () => {
-      animateIteration(steps, timeout);
-    });
-    setTimeout(() => {
-      animateColorChange(step, 'bar-to-red');
-      events.notify(step); 
-    }, timeout);
-  }
-}
-*/
-
