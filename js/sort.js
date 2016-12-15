@@ -5,7 +5,7 @@ var SORT = SORT || {};
   const CANVAS_WIDTH = 600;
   const CANVAS_TOP = 225;
   const NUMBER_OF_BARS = 12;
-  const BAR_COLOR_RED = 'bar-red'; 
+  const BAR_COLOR_RED = 'bar-to-red';
   const BAR_WIDTH = 25;
   const BAR_CORNER_RADIUS = 3;
   const BAR_GAP = 7;
@@ -15,21 +15,26 @@ var SORT = SORT || {};
   const BLINK_INTERVAL = 100;
   const BLINK_TIMEOUT = 1000;
 
-  ns.runSelectionSort = (i=0) => {
-    animateIteration(0);
-  }
-
-  var animateIteration = (i=0) => {
+  var animateSelection = (i=0) => {
     if (i < bars.length) {
       animateIndexOfMin(i, i, (m) => {
+        bars[i].animateColorChange('bar-to-blue');
+        bars[m].animateColorChange('bar-to-blue');
         animateSwap(i, m, () => { 
-          animateIteration(i+1);
+          if (i != m) {
+            bars[m].animateColorChange('bar-to-red');
+          }
+          animateSelection(i+1);
         });
       });
     }
+    else {
+      bars.reverse().map((b) => { b.animateColorChange('bar-to-red') });
+    }
   }
+  ns.animateSelection = animateSelection;
 
-  var animateIndexOfMin = (i, m, callback, timeout=500) => {
+  var animateIndexOfMin = (i, m, callback) => {
     if (i < bars.length) {
       bars[i].animateColorChange('bar-to-green');
       setTimeout(() => {
@@ -42,44 +47,79 @@ var SORT = SORT || {};
           bars[i].animateColorChange('bar-to-red');
         }
         animateIndexOfMin(i+1, m, callback);
-      }, timeout);
+      }, delay());
     }
     else {
       callback(m);
     }
   }
 
-  var animateSwap = (i, j, callback, timeout=1000) => {
-    bars[i].animateColorChange('bar-to-blue');
-    bars[j].animateColorChange('bar-to-blue');
+  var animateSwap = (i, j, callback) => {
+    var iX = canvas.calcX(i);
+    var jX = canvas.calcX(j);
+    var pi = new Promise((complete) => {
+      animateTranslateX(bars[i], jX, complete);
+    });
+    var pj = new Promise((complete) => {
+      animateTranslateX(bars[j], iX, complete);
+    });
+    Promise.all([pi, pj]).then(() => {
+      var t = bars[i];
+      bars[i] = bars[j];
+      bars[j] = t;
+      callback();
+    });
+  }
+  ns.animateSwap = animateSwap;
 
-    setTimeout(() => {
-      var iX = canvas.calcX(i);
-      var jX = canvas.calcX(j);
-      var pi = new Promise((complete) => {
-        animateTranslateX(bars[i], jX, complete); 
+  var animateInsertion = (i=1) => {
+    if (i < bars.length) {
+      animateTranslateY(bars[i], CANVAS_TOP + 5, () => {
+        bars[i].animateColorChange('bar-to-blue');
+        animateInsert(i-1, i, bars[i].getV(), (m) => {
+          animateTranslateY(bars[m], CANVAS_TOP - bars[m].getV(), () => {
+            bars.slice(0, i+1).map((b) => { b.animateColorChange('bar-to-orange') });
+            animateInsertion(i+1)
+          });
+        });
       });
-      var pj = new Promise((complete) => {
-        animateTranslateX(bars[j], iX, complete); 
-      });
-      Promise.all([pi, pj]).then(() => {
-        if (i != j) {
-          bars[i].animateColorChange('bar-to-red');
-        }
-        var t = bars[i];
-        bars[i] = bars[j];
-        bars[j] = t;
-        callback();
-      });
-    }, timeout);
+    }
+    else {
+      bars.reverse().map((b) => { b.animateColorChange('bar-to-red') });
+    }
+  }
+  ns.animateInsertion = animateInsertion;
+
+  var animateInsert = (j, rightMost, value, callback) => {
+    if (j >= 0 && bars[j].getV() > value) {
+      bars[j].animateColorChange('bar-to-green');
+      setTimeout(() => {
+        animateSwap(j, (j+1), () => {
+          bars[j+1].animateColorChange('bar-to-orange');
+          animateInsert(j-1, rightMost, value, callback);
+        });
+      }, delay());
+    }
+    else {
+      callback(j+1);
+    }
+  }
+
+  ns.calcYForInsertion = (b) => CANVAS_TOP + b.getV();
+
+  var animateTranslateY = (b, toY, callback) => {
+    var moves = makeMoves(b.getY(), toY);
+    animateTranslate(b, moves, callback, (y) => { return { x: b.getX(), y: y } });
   }
 
   var animateTranslateX = (b, toX, callback) => {
-    var fromX = b.getX();
-    var moves = makeMoves(fromX, toX);
-    moves = moves.map((x) => { return { x: x, y: b.getY() } });
-    var delay = (1/moves.length) * 500;
-    move(b, moves, delay, callback);
+    var moves = makeMoves(b.getX(), toX);
+    animateTranslate(b, moves, callback, (x) => { return { x: x, y: b.getY() } });
+  }
+
+  var animateTranslate = (b, moves, callback, f) => {
+    moves = moves.map(f)
+    move(b, moves, callback);
   }
 
   var makeMoves = (from, to) => {
@@ -93,12 +133,26 @@ var SORT = SORT || {};
     return moves;
   }
 
-  var move = (b, moves, delay, callback) => {
+  var defaultDelay = 200;
+
+  var setDelay = (newDelay) => {
+    defaultDelay = newDelay;
+  }
+  ns.setDelay = setDelay;
+
+  var delay = () => {
+    return defaultDelay;
+  }
+  ns.delay = delay;
+
+  var moveDelay = (len) => (1/len) * delay();
+
+  var move = (b, moves, callback) => {
     if ((coords = moves.shift())) {
       b.draw(coords.x, coords.y);
       setTimeout(() => {
-        move(b, moves, delay, callback);
-      }, delay);
+        move(b, moves, callback);
+      }, moveDelay(moves.length));
     }
     else {
       callback();
@@ -162,10 +216,11 @@ var SORT = SORT || {};
     }
   })();
   
-  ns.bars = canvas.bars;
-  var bars = ns.bars;
+  var bars = canvas.bars;
+  ns.bars = bars;
 
   ns.init = () => {
+    canvas.bars = new Array();
     canvas.clear(); 
     canvas.draw();
   };

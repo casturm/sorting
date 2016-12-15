@@ -7,18 +7,6 @@
     margin: 50px;
 }
 
-.bar-red {
-    fill: rgb(220, 20, 60);
-}
-
-.bar-green {
-    fill: rgb(0, 150, 76);
-}
-
-.bar-blue {
-    fill: lightblue;
-}
-
 .bar-to-blue {
     transition: fill .2s ease;
     fill: lightblue;
@@ -31,6 +19,15 @@
 
 .bar-to-green {
     transition: fill .5s ease;
-    fill: rgb(0, 150, 76);
+    fill: rgb(0, 153, 76);
 }
 
+.bar-to-orange {
+    transition: fill .5s ease;
+    fill: rgb(255, 178, 102);
+}
+
+.bar-to-purple {
+    transition: fill .5s ease;
+    fill: rgb(153, 0, 153);
+}
